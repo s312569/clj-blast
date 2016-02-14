@@ -22,7 +22,7 @@ iterations and likewise 'hsp-seq' on hits to get hsps. Hits and hsps
 have 'get-hit-value' and 'get-hsp-value' for accessing data. 
 
 ```clojure
-user> (with-open [r (reader blf)]
+user> (with-open [r (reader "/blast/output/file.xml")]
         (get-hsp-value (->> (iteration-seq r)
                             first
                             hit-seq
