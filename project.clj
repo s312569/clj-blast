@@ -1,5 +1,5 @@
-(defproject clj-blast "0.1.0"
-  :description "FIXME: write description"
+(defproject clj-blast "0.1.1"
+  :description "Parser for BLAST output in XML format."
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
