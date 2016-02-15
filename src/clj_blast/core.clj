@@ -50,11 +50,12 @@
     :Hsp_pattern-to
     :Hsp_density"
   [hsp key]
-  (if (= key :Hsp_midline)
-    (->> (:content (node hsp))
-         (filter #(= (:tag %) :Hsp_midline))
-         first :content first)
-    (xml1-> hsp key text)))
+  (and hsp
+       (if (= key :Hsp_midline)
+         (->> (:content (node hsp))
+              (filter #(= (:tag %) :Hsp_midline))
+              first :content first)
+         (xml1-> hsp key text))))
 
 (defn get-hit-value
   "Takes a blastHit object and returns the value corresponding to key.
@@ -72,12 +73,12 @@
 (defn hit-seq
   "Returns a lazy list of hits (as zippers)."
   [it]
-  (xml-> it :Iteration_hits :Hit))
+  (and it (xml-> it :Iteration_hits :Hit)))
 
 (defn hsp-seq
   "Returns a lazy list of HSPs (as zippers)."
   [hit]
-  (xml-> hit :Hit_hsps :Hsp))
+  (and hit (xml-> hit :Hit_hsps :Hsp)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; alignment
