@@ -4,11 +4,14 @@
             [clojure.zip :refer [xml-zip node]]
             [clojure.data.zip.xml :refer [text xml1-> xml->]]
             [clj-commons-exec :refer [sh]]
+            [taoensso.nippy :refer [freeze thaw]]
+            [biodb.core :as bdb]
             [clj-fasta.core :refer [fasta->file fasta-seq]]
             [clojure.java.io :refer [reader]]))
 
 (defn iteration-seq
-  "Returns a lazy list of iterations in a blast XML file."
+  "Returns a lazy list of zippers representing iterations in a blast
+  XML file."
   [reader]
   (->> (parse reader)
        :content
@@ -79,6 +82,26 @@
   "Returns a lazy list of HSPs (as zippers)."
   [hit]
   (and hit (xml-> hit :Hit_hsps :Hsp)))
+
+(defn accession
+  "Returns the accession of the query sequence in an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-ID text)))
+
+(defn query-length
+  "Returns the query length from an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-len text)))
+
+(defn query-def
+  "Returns the def line of the query from an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-def text)))
+
+(defn iteration-number
+  "Returns the iteration number."
+  [it]
+  (and it (xml1-> it :Iteration_iter-num text)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; alignment
@@ -183,3 +206,22 @@
       (doall
        (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml"))
              (partition-all 10000 (fasta-seq r)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; biodb compatability
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod bdb/table-spec :blast
+  [q]
+  (vector [:accession :text "PRIMARY KEY"]
+          [:src :binary "NOT NULL"]))
+
+(defmethod bdb/prep-sequences :blast
+  [q]
+  (->> (:coll q)
+       (map #(hash-map :accession (accession %) :src (freeze (node %))))))
+
+(defmethod bdb/restore-sequence :blast
+  [q]
+  (xml-zip (thaw (:src (dissoc q :type)))))
+
