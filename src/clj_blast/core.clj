@@ -9,49 +9,13 @@
             [clj-fasta.core :refer [fasta->file fasta-seq]]
             [clojure.java.io :refer [reader]]))
 
-(defn iteration-seq
-  "Returns a lazy list of zippers representing iterations in a blast
-  XML file."
-  [reader]
-  (->> (parse reader)
-       :content
-       (filter #(= (:tag %) :BlastOutput_iterations))
-       first
-       :content
-       (filter #(= (:tag %) :Iteration))
-       (map xml-zip)))
+(declare hit->hm hsp-alignment)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; accessors
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn- get-hit-value
+  [hit key]
+  (xml1-> hit key text))
 
-(defn get-hsp-value
-  "Takes a blastHsp object and returns the value corresponding to key.
-   Keys are the keyword version of the XML nodes in the BLAST xml
-   output.  All values are returned as strings. Typical BLAST HSP
-   keys are:
-    :Hsp_bit-score
-    :Hsp_score
-    :Hsp_evalue
-    :Hsp_query-from
-    :Hsp_query-to
-    :Hsp_hit-from
-    :Hsp_hit-to
-    :Hsp_positive
-    :Hsp_identity
-    :Hsp_gaps
-    :Hsp_hitgaps
-    :Hsp_querygaps
-    :Hsp_qseq
-    :Hsp_hseq
-    :Hsp_midline
-    :Hsp_align-len
-    :Hsp_query-frame
-    :Hsp_hit-frame
-    :Hsp_num
-    :Hsp_pattern-from
-    :Hsp_pattern-to
-    :Hsp_density"
+(defn- get-hsp-value
   [hsp key]
   (and hsp
        (if (= key :Hsp_midline)
@@ -60,52 +24,29 @@
               first :content first)
          (xml1-> hsp key text))))
 
-(defn get-hit-value
-  "Takes a blastHit object and returns the value corresponding to key.
-  Keys are the keyword version of the XML nodes in the BLAST xml
-  output.  All values are returned as strings. Typical BLAST Hit
-  values are:
-   :Hit_id
-   :Hit_len
-   :Hit_accession
-   :Hit_def
-   :Hit_num"
-  [hit key]
-  (xml1-> hit key text))
+(defn- hsp->hm
+  [hsp]
+  (let [doubles [:Hsp_bit-score :Hsp_score :Hsp_evalue]
+        integers [:Hsp_query-from :Hsp_query-to :Hsp_hit-from :Hsp_hit-to 
+                  :Hsp_pattern-to :Hsp_query-frame :Hsp_hit-frame
+                  :Hsp_identity :Hsp_positive :Hsp_gaps :Hsp_align-len
+                  :Hsp_density :Hsp_pattern-from :Hsp_num]
+        others [:Hsp_qseq :Hsp_hseq :Hsp_midline]]
+    (-> (merge (into {} (map #(vector % (if-let [v (get-hsp-value hsp %)] (Double/parseDouble v)))
+                             doubles))
+               (into {} (map #(vector % (if-let [v (get-hsp-value hsp %)] (Integer/parseInt v)))
+                             integers))
+               (into {} (map #(vector % (get-hsp-value hsp %)) others)))
+        (assoc :alignment (hsp-alignment hsp)))))
 
-(defn hit-seq
-  "Returns a lazy list of hits (as zippers)."
-  [it]
-  (and it (xml-> it :Iteration_hits :Hit)))
-
-(defn hsp-seq
-  "Returns a lazy list of HSPs (as zippers)."
+(defn- hit->hm
   [hit]
-  (and hit (xml-> hit :Hit_hsps :Hsp)))
-
-(defn accession
-  "Returns the accession of the query sequence in an iteration."
-  [it]
-  (and it (xml1-> it :Iteration_query-ID text)))
-
-(defn query-length
-  "Returns the query length from an iteration."
-  [it]
-  (and it (xml1-> it :Iteration_query-len text)))
-
-(defn query-def
-  "Returns the def line of the query from an iteration."
-  [it]
-  (and it (xml1-> it :Iteration_query-def text)))
-
-(defn iteration-number
-  "Returns the iteration number."
-  [it]
-  (and it (xml1-> it :Iteration_iter-num text)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; alignment
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (-> (->> (map #(vector % (get-hit-value hit %))
+                [:Hit_id :Hit_len :Hit_accession :Hit_def :Hit_num])
+           (into {}))
+      (assoc :hsps (map hsp->hm (xml-> hit :Hit_hsps :Hsp)))
+      (update-in [:Hit_len] #(if % (Integer/parseInt %)))
+      (update-in [:Hit_num] #(if % (Integer/parseInt %)))))
 
 (defn- residue-counter [start end]
   (let [c (atom start)]
@@ -131,8 +72,7 @@
                                    (drop 1 args)))]
     (map form (partition-all 52 (first args)))))
 
-(defn hsp-alignment
-  "Returns the alignment from a HSP as a string."
+(defn- hsp-alignment
   [hsp]
   (let [l (interleave
            (get-lines hsp '(:Hsp_qseq :Hsp_query-from :Hsp_query-to))
@@ -148,6 +88,63 @@
                         (last x) "\n"))]
     (apply str (interpose "\n" (map #(apply str %)
                                     (partition-all 3 (map pf l)))))))
+
+(defn- significant?
+  [hit param score]
+  (condp = param
+    :evalue (<= (:Hsp_evalue (first (:hsps hit))) score)
+    :bit-score (>= (:Hsp_bit-score (first (:hsps hit))) score)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; accessors
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn iteration-seq
+  "Returns a lazy list of zippers representing iterations in a blast
+  XML file."
+  [reader]
+  (->> (parse reader)
+       :content
+       (filter #(= (:tag %) :BlastOutput_iterations))
+       first
+       :content
+       (filter #(= (:tag %) :Iteration))
+       (map xml-zip)))
+
+(defn accession
+  "Returns the accession of the query sequence in an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-ID text)))
+
+(defn query-length
+  "Returns the query length from an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-len text)))
+
+(defn query-def
+  "Returns the def line of the query from an iteration."
+  [it]
+  (and it (xml1-> it :Iteration_query-def text)))
+
+(defn iteration-number
+  "Returns the iteration number."
+  [it]
+  (and it (xml1-> it :Iteration_iter-num text)))
+
+(defn hit-seq
+  "Returns a lazy list of hits as maps representing a blast hit. HSPs
+  can be accessed using :hsps. Alignments can be accessed
+  using :alignment on individual HSP maps. If an evalue or bit-score
+  keyword argument is supplied hits will be filtered for
+  significance."
+  [it & {:keys [evalue bit-score] :or [evalue nil bit-score nil]}]
+  (if it
+    (let [hits (map #(assoc (hit->hm %) :query-accession (accession it))
+                    (xml-> it :Iteration_hits :Hit))]
+      (cond (and evalue bit-score) (throw (Exception. "Supply one of :bit-score or :evalue only."))
+            evalue (filter #(significant? % :evalue evalue) hits)
+            bit-score (filter #(significant? % :bit-score bit-score) hits)
+            :else hits))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; blasting
