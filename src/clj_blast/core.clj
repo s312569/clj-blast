@@ -92,8 +92,8 @@
 (defn- significant?
   [hit param score]
   (condp = param
-    :evalue (<= (:Hsp_evalue (first (:hsps hit))) score)
-    :bit-score (>= (:Hsp_bit-score (first (:hsps hit))) score)))
+    :evalue (some #(<= (:Hsp_evalue %) score) (:hsps hit))
+    :bit-score (some #(>= (:Hsp_bit-score %) score) (:hsps hit))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; accessors
