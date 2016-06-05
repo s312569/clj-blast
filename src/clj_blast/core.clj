@@ -6,6 +6,7 @@
             [clj-commons-exec :refer [sh]]
             [taoensso.nippy :refer [freeze thaw]]
             [biodb.core :as bdb]
+            [clojure.string :refer [split]]
             [clj-fasta.core :refer [fasta->file fasta-seq]]
             [clojure.java.io :refer [reader]]))
 
@@ -114,7 +115,9 @@
 (defn accession
   "Returns the accession of the query sequence in an iteration."
   [it]
-  (and it (xml1-> it :Iteration_query-ID text)))
+  (and it (-> (xml1-> it :Iteration_query-def text)
+              (split #"\s+")
+              first)))
 
 (defn query-length
   "Returns the query length from an iteration."
