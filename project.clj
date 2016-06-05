@@ -1,4 +1,4 @@
-(defproject clj-blast "0.1.5"
+(defproject clj-blast "0.1.6"
   :description "Parser for BLAST output in XML format."
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
