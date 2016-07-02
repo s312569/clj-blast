@@ -188,14 +188,22 @@
           (throw (Throwable.
                   (str "Exception: " (:exception bl)))))))))
 
-(defn blast
-  "Takes a collection of fasta sequences and blasts them against the
-  specified database."
+(defn- blast-partition
   [bs program db outfile & {:keys [params] :or {params {}}}]
   (let [i (absolute-path (fasta->file bs (temp-file "seq-")))]
     (try
       (run-blast program (absolute-path db) i (absolute-path outfile) params)
       (finally (delete i)))))
+
+(defn blast
+  "Takes a collection of fasta sequences and blasts them against the
+  specified database. Blasts 10,000 sequences at a time in parallel
+  using pmap."
+  [bs program db outfile & {:keys [params] :or {params {}}}]
+  (let [c (atom 0)]
+    (doall
+     (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml"))
+           (partition-all 10000 bs)))))
 
 (defn blast-file
   "Blasts a file with fasta formatted sequences. Blasts 10,000
