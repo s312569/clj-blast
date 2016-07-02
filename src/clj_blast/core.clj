@@ -233,3 +233,9 @@
   [q]
   (xml-zip (thaw (:src (dissoc q :type)))))
 
+(defmethod bdb/prep-sequences :blast-homemade
+  [q]
+  (->> (:coll q)
+       (map #(hash-map :accession (first (split (query-def %) #"\s+"))
+                       :src (freeze (node %))))))
+
