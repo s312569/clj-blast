@@ -4,7 +4,6 @@
             [clojure.zip :refer [xml-zip node]]
             [clojure.data.zip.xml :refer [text xml1-> xml->]]
             [clj-commons-exec :refer [sh]]
-            [taoensso.nippy :refer [freeze thaw]]
             [biodb.core :as bdb]
             [clojure.string :refer [split]]
             [clj-fasta.core :refer [fasta->file fasta-seq]]
@@ -227,15 +226,15 @@
 (defmethod bdb/prep-sequences :blast
   [q]
   (->> (:coll q)
-       (map #(hash-map :accession (accession %) :src (freeze (node %))))))
+       (map #(hash-map :accession (accession %) :src (bdb/freeze (node %))))))
 
 (defmethod bdb/restore-sequence :blast
   [q]
-  (xml-zip (thaw (:src (dissoc q :type)))))
+  (xml-zip (bdb/thaw (:src (dissoc q :type)))))
 
 (defmethod bdb/prep-sequences :blast-homemade
   [q]
   (->> (:coll q)
        (map #(hash-map :accession (first (split (query-def %) #"\s+"))
-                       :src (freeze (node %))))))
+                       :src (bdb/freeze (node %))))))
 
