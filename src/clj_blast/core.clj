@@ -215,6 +215,23 @@
              (partition-all 10000 (fasta-seq r)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; sequence retrieval
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn retrieve-sequence
+  ([acc db] (retrieve-sequence acc db ["-dbtype" "prot"]))
+  ([acc db arg-vec]
+   (let [rbs @(sh (concat ["blastdbcmd" "-db" db "-entry" acc] arg-vec))]
+     (if (= (:exit rbs) 0)
+       (with-open [r (reader (:out rbs))]
+         (fasta-seq r))
+       (if (:err rbs)
+         (throw (Throwable.
+                 (str "Blast error: " (:err rbs))))
+         (throw (Throwable.
+                 (str "Exception: " (:exception rbs)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; biodb compatability
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -231,10 +248,4 @@
 (defmethod bdb/restore-sequence :blast
   [q]
   (xml-zip (bdb/thaw (:src (dissoc q :type)))))
-
-(defmethod bdb/prep-sequences :blast-homemade
-  [q]
-  (->> (:coll q)
-       (map #(hash-map :accession (first (split (query-def %) #"\s+"))
-                       :src (bdb/freeze (node %))))))
 
