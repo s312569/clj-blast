@@ -7,7 +7,7 @@ A parser for BLAST XML files.
 Import from Clojars:
 
 ```clojure
-[clj-blast "0.2.1"]
+[clj-blast "0.2.2"]
 ```
 
 Use in your namespace:
@@ -69,6 +69,10 @@ user>
 ```
 
 Note that `retrieve-sequence` is **not** lazy.
+
+Blast databases can be created using `create-blastdb` and
+`create-blastdb-file` that work on collections of fasta sequences (see
+clj-fasta) and fasta formatted files respectively.
 
 ## License
 

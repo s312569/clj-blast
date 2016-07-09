@@ -254,6 +254,37 @@
    (blastdbcommand-cmd coll db dbtype outfile)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; sequence retrieval
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn create-blastdb
+  "Takes a collection of fasta sequences, writes them to the specified
+  file and creates a blast database. Returns the blast database path."
+  ([coll db-name] (create-blastdb coll db-name "prot"))
+  ([coll db-name dbtype]
+   (let [faf (fasta->file coll db-name)]
+     (try
+       (let [db @(sh ["makeblastdb" "-in" faf "-dbtype" dbtype "-parse_seqids"])]
+         (if (= (:exit db) 0)
+           faf
+           (if (:err db)
+             (throw (Exception. (str "makeblastdb error: " (:err db))))
+             (throw (Exception. (str "Exception: " (:exception db)))))))))))
+
+(defn create-blastdb-file
+  "Takes a path to a file of fasta sequences and creates a blast
+  database. Returns the blast database path."
+  ([file] (create-blastdb-file file "prot"))
+  ([file dbtype]
+   (try
+     (let [db @(sh ["makeblastdb" "-in" file "-dbtype" dbtype "-parse_seqids"])]
+       (if (= (:exit db) 0)
+         file
+         (if (:err db)
+           (throw (Exception. (str "makeblastdb error: " (:err db))))
+           (throw (Exception. (str "Exception: " (:exception db))))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; biodb compatability
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
