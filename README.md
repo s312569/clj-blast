@@ -7,7 +7,7 @@ A parser for BLAST XML files.
 Import from Clojars:
 
 ```clojure
-[clj-blast "0.1.9"]
+[clj-blast "0.2.0"]
 ```
 
 Use in your namespace:
@@ -50,7 +50,25 @@ user> (with-open [r (reader tf)]
 user>
 ```
 
-Blasts can be performed using 'blast' and 'blast-file'.
+Blasts can be performed using `blast` and `blast-file`.
+
+Sequences can be retrieved using `retrieve-sequence` and
+`blastdb->file`:
+
+```clojure
+user> (with-open [r (reader sp)]
+        (blastdb->file (take 10000 (map :accession (fasta-seq r)))
+	               "/path/blastdb"
+		       "/path/outfile"
+"/path/outfile"
+user>
+user> (retrieve-sequence ["comp0_c0_seq1"] "/path/blastdb" "nucl")
+({:accession "lcl|comp0_c0_seq1", :description "len=203 path=[521:0-202]",
+ :sequence "GCGCATT..."})
+user>
+```
+
+Note that `retrieve-sequence` is **not** lazy.
 
 ## License
 

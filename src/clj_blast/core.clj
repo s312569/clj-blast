@@ -1,11 +1,11 @@
 (ns clj-blast.core
-  (:require [fs.core :refer [absolute-path temp-file delete]]
+  (:require [fs.core :refer [absolute-path temp-file delete exists?]]
             [clojure.data.xml :refer [parse]]
             [clojure.zip :refer [xml-zip node]]
             [clojure.data.zip.xml :refer [text xml1-> xml->]]
             [clj-commons-exec :refer [sh]]
             [biodb.core :as bdb]
-            [clojure.string :refer [split]]
+            [clojure.string :refer [split trim]]
             [clj-fasta.core :refer [fasta->file fasta-seq]]
             [clojure.java.io :refer [reader]]))
 
@@ -218,18 +218,40 @@
 ;; sequence retrieval
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- blastdbcommand-cmd
+  ([coll db dbtype] (blastdbcommand-cmd coll db dbtype nil))
+  ([coll db dbtype outfile]
+   (let [accs (if (> (count coll) 1000)
+                ["-entry_batch" (str (fasta->file coll (temp-file "bdbc-") :func identity))]
+                ["-entry" (->> (map trim coll) (interpose ",") (apply str))])
+         out (if outfile ["-out" outfile] [])]
+     (try
+       (let [rbs @(sh (concat ["blastdbcmd" "-db" db "-dbtype" dbtype] accs out))]
+         (if (= (:exit rbs) 0)
+           (or outfile
+               (with-open [r (java.io.BufferedReader. (java.io.StringReader. (:out rbs)))]
+                 (doall (fasta-seq r))))
+           (if (:err rbs)
+             (if-not (re-find #"OID not found" (:err rbs))
+               (throw (Exception. (str "Blast error: " (:err rbs)))))
+             (throw (Exception. (str "Exception: " (:exception rbs)))))))
+       (finally
+         (if (string? accs)
+           (delete accs)))))))
+
 (defn retrieve-sequence
-  ([acc db] (retrieve-sequence acc db ["-dbtype" "prot"]))
-  ([acc db arg-vec]
-   (let [rbs @(sh (concat ["blastdbcmd" "-db" db "-entry" acc] arg-vec))]
-     (if (= (:exit rbs) 0)
-       (with-open [r (reader (:out rbs))]
-         (fasta-seq r))
-       (if (:err rbs)
-         (throw (Throwable.
-                 (str "Blast error: " (:err rbs))))
-         (throw (Throwable.
-                 (str "Exception: " (:exception rbs)))))))))
+  "Takes a collection of accession numbers and retrieves a collection
+  of fasta sequences from a blast database. NOT LAZY!"
+  ([coll db] (retrieve-sequence coll db "prot"))
+  ([coll db dbtype]
+   (blastdbcommand-cmd coll db dbtype)))
+
+(defn blastdb->file
+  "Takes a collection of accessions, retrieves them from a blastdb and
+  sends them to the outfile in fasta format."
+  ([coll db outfile] (blastdb->file coll db outfile "prot"))
+  ([coll db outfile dbtype]
+   (blastdbcommand-cmd coll db dbtype outfile)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; biodb compatability
