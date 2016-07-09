@@ -7,7 +7,7 @@ A parser for BLAST XML files.
 Import from Clojars:
 
 ```clojure
-[clj-blast "0.2.2"]
+[clj-blast "0.2.3"]
 ```
 
 Use in your namespace:

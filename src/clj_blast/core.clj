@@ -201,8 +201,9 @@
   [bs program db outfile & {:keys [params] :or {params {}}}]
   (let [c (atom 0)]
     (doall
-     (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml"))
-           (partition-all 10000 bs)))))
+     (->> (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml"))
+                (partition-all 10000 bs))
+          flatten))))
 
 (defn blast-file
   "Blasts a file with fasta formatted sequences. Blasts 10,000
@@ -211,8 +212,9 @@
   (let [c (atom 0)]
     (with-open [r (reader file)]
       (doall
-       (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml"))
-             (partition-all 10000 (fasta-seq r)))))))
+       (->> (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml"))
+                  (partition-all 10000 (fasta-seq r)))
+            flatten)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence retrieval
@@ -254,7 +256,7 @@
    (blastdbcommand-cmd coll db dbtype outfile)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; sequence retrieval
+;; db creation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn create-blastdb
@@ -264,7 +266,7 @@
   ([coll db-name dbtype]
    (let [faf (fasta->file coll db-name)]
      (try
-       (let [db @(sh ["makeblastdb" "-in" faf "-dbtype" dbtype "-parse_seqids"])]
+       (let [db @(sh ["makeblastdb" "-in" (str faf) "-dbtype" dbtype "-parse_seqids"])]
          (if (= (:exit db) 0)
            faf
            (if (:err db)
@@ -277,7 +279,7 @@
   ([file] (create-blastdb-file file "prot"))
   ([file dbtype]
    (try
-     (let [db @(sh ["makeblastdb" "-in" file "-dbtype" dbtype "-parse_seqids"])]
+     (let [db @(sh ["makeblastdb" "-in" (str file) "-dbtype" dbtype "-parse_seqids"])]
        (if (= (:exit db) 0)
          file
          (if (:err db)
