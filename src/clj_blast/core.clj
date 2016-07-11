@@ -201,7 +201,8 @@
   [bs program db outfile & {:keys [params] :or {params {}}}]
   (let [c (atom 0)]
     (doall
-     (->> (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml"))
+     (->> (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml")
+                                  :params params)
                 (partition-all 10000 bs))
           flatten))))
 
@@ -212,7 +213,8 @@
   (let [c (atom 0)]
     (with-open [r (reader file)]
       (doall
-       (->> (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml"))
+       (->> (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml")
+                          :params params)
                   (partition-all 10000 (fasta-seq r)))
             flatten)))))
 
