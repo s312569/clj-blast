@@ -228,9 +228,9 @@
    (let [accs (if (> (count coll) 1000)
                 ["-entry_batch" (str (fasta->file coll (temp-file "bdbc-") :func identity))]
                 ["-entry" (->> (map trim coll) (interpose ",") (apply str))])
-         out (if outfile ["-out" outfile] [])]
+         out (if outfile ["-out" (str outfile)] [])]
      (try
-       (let [rbs @(sh (concat ["blastdbcmd" "-db" db "-dbtype" dbtype] accs out))]
+       (let [rbs @(sh (concat ["blastdbcmd" "-db" (str db) "-dbtype" dbtype] accs out))]
          (if (= (:exit rbs) 0)
            (or outfile
                (with-open [r (java.io.BufferedReader. (java.io.StringReader. (:out rbs)))]
