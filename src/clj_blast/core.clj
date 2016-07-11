@@ -182,9 +182,9 @@
       (if (= 0 (:exit bl))
         out
         (if (:err bl)
-          (throw (Throwable.
+          (throw (Exception.
                   (str "Blast error: " (:err bl))))
-          (throw (Throwable.
+          (throw (Exception.
                   (str "Exception: " (:exception bl)))))))))
 
 (defn- blast-partition
