@@ -121,7 +121,8 @@
 (defn query-length
   "Returns the query length from an iteration."
   [it]
-  (and it (xml1-> it :Iteration_query-len text)))
+  (if-let [ql (and it (xml1-> it :Iteration_query-len text))]
+    (Integer/parseInt ql)))
 
 (defn query-def
   "Returns the def line of the query from an iteration."
@@ -131,7 +132,8 @@
 (defn iteration-number
   "Returns the iteration number."
   [it]
-  (and it (xml1-> it :Iteration_iter-num text)))
+  (if-let [in (and it (xml1-> it :Iteration_iter-num text))]
+    (Integer/parseInt in)))
 
 (defn hit-seq
   "Returns a lazy list of hits as maps representing a blast hit. HSPs
