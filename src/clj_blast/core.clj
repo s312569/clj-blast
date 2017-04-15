@@ -1,5 +1,5 @@
 (ns clj-blast.core
-  (:require [fs.core :refer [absolute-path temp-file delete exists?]]
+  (:require [me.raynes.fs :as fs]
             [clojure.data.xml :refer [parse]]
             [clojure.zip :refer [xml-zip node]]
             [clojure.data.zip.xml :refer [text xml1-> xml->]]
@@ -191,10 +191,10 @@
 
 (defn- blast-partition
   [bs program db outfile & {:keys [params] :or {params {}}}]
-  (let [i (absolute-path (fasta->file bs (temp-file "seq-")))]
+  (let [i (fs/absolute (fasta->file bs (fs/temp-file "seq-")))]
     (try
-      (run-blast program (absolute-path db) i (absolute-path outfile) params)
-      (finally (delete i)))))
+      (run-blast program (fs/absolute db) i (fs/absolute outfile) params)
+      (finally (fs/delete i)))))
 
 (defn blast
   "Takes a collection of fasta sequences and blasts them against the
@@ -203,7 +203,9 @@
   [bs program db outfile & {:keys [params] :or {params {}}}]
   (let [c (atom 0)]
     (doall
-     (->> (pmap #(blast-partition % program db (str outfile "-" (swap! c inc) ".xml")
+     (->> (pmap #(blast-partition % program db
+                                  (str (fs/base-name outfile true) "-" (swap! c inc)
+                                       (fs/extension outfile))
                                   :params params)
                 (partition-all 10000 bs))
           flatten))))
@@ -214,11 +216,7 @@
   [file program db outfile & {:keys [params] :or {params {}}}]
   (let [c (atom 0)]
     (with-open [r (reader file)]
-      (doall
-       (->> (pmap #(blast % program db (str outfile "-" (swap! c inc) ".xml")
-                          :params params)
-                  (partition-all 10000 (fasta-seq r)))
-            flatten)))))
+      (blast (fasta-seq r) program db outfile :params params))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence retrieval
@@ -228,7 +226,7 @@
   ([coll db dbtype] (blastdbcommand-cmd coll db dbtype nil))
   ([coll db dbtype outfile]
    (let [accs (if (> (count coll) 1000)
-                ["-entry_batch" (str (fasta->file coll (temp-file "bdbc-") :func identity))]
+                ["-entry_batch" (str (fasta->file coll (fs/temp-file "bdbc-") :func identity))]
                 ["-entry" (->> (map trim coll) (interpose ",") (apply str))])
          out (if outfile ["-out" (str outfile)] [])]
      (try
@@ -243,7 +241,7 @@
              (throw (Exception. (str "Exception: " (:exception rbs)))))))
        (finally
          (if (string? accs)
-           (delete accs)))))))
+           (fs/delete accs)))))))
 
 (defn retrieve-sequence
   "Takes a collection of accession numbers and retrieves a collection
