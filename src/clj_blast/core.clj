@@ -191,9 +191,9 @@
 
 (defn- blast-partition
   [bs program db outfile & {:keys [params] :or {params {}}}]
-  (let [i (fs/absolute (fasta->file bs (fs/temp-file "seq-")))]
+  (let [i (str (fs/absolute (fasta->file bs (fs/temp-file "seq-"))))]
     (try
-      (run-blast program (fs/absolute db) i (fs/absolute outfile) params)
+      (run-blast program (str (fs/absolute db)) i (str (fs/absolute outfile)) params)
       (finally (fs/delete i)))))
 
 (defn blast
@@ -201,12 +201,13 @@
   specified database. Blasts 10,000 sequences at a time in parallel
   using pmap."
   [bs program db outfile & {:keys [params] :or {params {}}}]
-  (let [c (atom 0)]
+  (let [of (if (second (partition-all 10000 bs))
+             (let [c (atom 0)]
+               (fn [o]
+                 (str (fs/base-name o true) "-" (swap! c inc) (fs/extension o))))
+             identity)]
     (doall
-     (->> (pmap #(blast-partition % program db
-                                  (str (fs/base-name outfile true) "-" (swap! c inc)
-                                       (fs/extension outfile))
-                                  :params params)
+     (->> (pmap #(blast-partition % program db (of outfile) :params params)
                 (partition-all 10000 bs))
           flatten))))
 
